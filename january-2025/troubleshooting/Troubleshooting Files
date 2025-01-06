@@ -1,0 +1,79 @@
+# state-lock-examples.md
+## State Lock Issues
+
+### Error:
+```
+Error: Error acquiring the state lock
+```
+
+### Solution:
+```bash
+# Check lock status
+az storage blob show-lease-status \
+  --container-name tfstate \
+  --name terraform.tfstate \
+  --account-name <storage_account>
+
+# Force unlock if necessary
+terraform force-unlock <LOCK_ID>
+```
+
+# dependency-issues.md
+## Dependency Issues
+
+### Circular Dependencies
+```hcl
+# DON'T DO THIS
+resource "azurerm_resource_group" "example" {
+  tags = {
+    vnet_id = azurerm_virtual_network.example.id  # Creates circular dependency
+  }
+}
+
+resource "azurerm_virtual_network" "example" {
+  resource_group_name = azurerm_resource_group.example.name
+}
+```
+
+### Solution:
+```hcl
+# DO THIS
+resource "azurerm_resource_group" "example" {
+  name     = "example-rg"
+  location = "eastus"
+}
+
+resource "azurerm_virtual_network" "example" {
+  name                = "example-vnet"
+  resource_group_name = azurerm_resource_group.example.name
+  location            = azurerm_resource_group.example.location
+  
+  # Use depends_on for explicit dependencies if needed
+  depends_on = [
+    azurerm_resource_group.example
+  ]
+}
+```
+
+# auth-issues.md
+## Authentication Issues
+
+### Service Principal Authentication
+```bash
+# Check Azure CLI auth
+az account show
+
+# Verify environment variables
+echo $ARM_SUBSCRIPTION_ID
+echo $ARM_TENANT_ID
+echo $ARM_CLIENT_ID
+
+# Refresh Azure CLI token
+az login
+```
+
+### Common Solutions:
+1. Verify service principal hasn't expired
+2. Check RBAC permissions
+3. Validate subscription access
+4. Confirm environment variables are set correctly
